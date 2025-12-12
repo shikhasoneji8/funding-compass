@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, TrendingUp, DollarSign, Target, BarChart3, AlertTriangle } from "lucide-react";
+import { AdvisorSkeleton } from "./AdvisorSkeleton";
 
 interface Project {
   id: string;
@@ -74,6 +75,10 @@ export function FinancialModel({ project }: { project: Project }) {
       setLoading(false);
     }
   };
+
+  if (loading && !data) {
+    return <AdvisorSkeleton type="financial_model" />;
+  }
 
   if (!data) {
     return (

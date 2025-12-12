@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Search, Shield, Swords, Target } from "lucide-react";
+import { AdvisorSkeleton } from "./AdvisorSkeleton";
 
 interface Project {
   id: string;
@@ -61,6 +62,10 @@ export function CompetitorAnalysis({ project }: { project: Project }) {
       setLoading(false);
     }
   };
+
+  if (loading && !analysis) {
+    return <AdvisorSkeleton type="competitor_analysis" />;
+  }
 
   if (!analysis) {
     return (

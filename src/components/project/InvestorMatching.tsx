@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Users, Star, Building2, Rocket, Plus } from "lucide-react";
+import { AdvisorSkeleton } from "./AdvisorSkeleton";
 
 interface Project {
   id: string;
@@ -84,6 +85,10 @@ export function InvestorMatching({ project, onAddInvestor }: InvestorMatchingPro
       toast.success(`Added ${investor.name} to your CRM!`);
     }
   };
+
+  if (loading && !data) {
+    return <AdvisorSkeleton type="investor_matching" />;
+  }
 
   if (!data) {
     return (

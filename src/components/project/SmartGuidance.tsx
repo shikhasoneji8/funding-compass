@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Sparkles, DollarSign, PieChart, Target, TrendingUp } from "lucide-react";
+import { AdvisorSkeleton } from "./AdvisorSkeleton";
 
 interface Project {
   id: string;
@@ -64,6 +65,10 @@ export function SmartGuidance({ project }: { project: Project }) {
       setLoading(false);
     }
   };
+
+  if (loading && !guidance) {
+    return <AdvisorSkeleton type="smart_guidance" />;
+  }
 
   if (!guidance) {
     return (
