@@ -7,7 +7,17 @@ import { cn } from "@/lib/utils";
 interface LocationSuggestion {
   display_name: string;
   place_id: number;
+  address?: {
+    country_code?: string;
+  };
 }
+
+const getCountryFlag = (countryCode?: string): string => {
+  if (!countryCode) return "";
+  const code = countryCode.toUpperCase();
+  const offset = 127397;
+  return String.fromCodePoint(...[...code].map(c => c.charCodeAt(0) + offset));
+};
 
 interface LocationAutocompleteProps {
   value: string;
@@ -162,14 +172,16 @@ export function LocationAutocomplete({
                 key={suggestion.place_id}
                 onClick={() => handleSelect(suggestion)}
                 className={cn(
-                  "px-3 py-2 cursor-pointer text-sm transition-colors flex items-start gap-2",
+                  "px-3 py-2 cursor-pointer text-sm transition-colors flex items-center gap-2",
                   index === selectedIndex
                     ? "bg-accent text-accent-foreground"
                     : "hover:bg-muted"
                 )}
               >
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
-                <span className="line-clamp-2">{suggestion.display_name}</span>
+                <span className="text-lg shrink-0">
+                  {getCountryFlag(suggestion.address?.country_code) || "🌍"}
+                </span>
+                <span className="line-clamp-1">{suggestion.display_name}</span>
               </li>
             ))}
           </ul>
