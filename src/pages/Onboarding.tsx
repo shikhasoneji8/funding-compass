@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import {
   Tooltip,
   TooltipContent,
@@ -399,7 +400,19 @@ export default function Onboarding() {
               {renderField("fullName", "input", undefined, { placeholder: "Jane Smith" })}
               {renderField("email", "input", undefined, { placeholder: "you@startup.com" })}
               {renderField("linkedinUrl", "input", undefined, { placeholder: "linkedin.com/in/janesmith" })}
-              {renderField("location", "input", undefined, { placeholder: "San Francisco, CA" })}
+              <div className="space-y-2" ref={(el) => (formRefs.current["location"] = el)}>
+                <Label htmlFor="location">Location</Label>
+                <LocationAutocomplete
+                  id="location"
+                  value={formData.location}
+                  onChange={(value) => updateField("location", value)}
+                  placeholder="Search for your city..."
+                  error={!!errors.location}
+                />
+                {errors.location && (
+                  <p className="text-sm text-destructive">{errors.location}</p>
+                )}
+              </div>
               {renderField("raisingStage", "select", [
                 { value: "idea-stage", label: "Idea Stage" },
                 { value: "pre-seed", label: "Pre-seed" },
