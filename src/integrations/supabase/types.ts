@@ -149,8 +149,8 @@ export type Database = {
       }
       projects: {
         Row: {
-          ask_amount: string
-          business_model: string
+          ask_amount: string | null
+          business_model: string | null
           category: string
           competition: string | null
           created_at: string
@@ -169,14 +169,14 @@ export type Database = {
           traction_revenue: string | null
           traction_users: string | null
           updated_at: string
-          use_of_funds: string
+          use_of_funds: string | null
           user_id: string
           website: string | null
           why_now: string | null
         }
         Insert: {
-          ask_amount: string
-          business_model: string
+          ask_amount?: string | null
+          business_model?: string | null
           category: string
           competition?: string | null
           created_at?: string
@@ -195,14 +195,14 @@ export type Database = {
           traction_revenue?: string | null
           traction_users?: string | null
           updated_at?: string
-          use_of_funds: string
+          use_of_funds?: string | null
           user_id: string
           website?: string | null
           why_now?: string | null
         }
         Update: {
-          ask_amount?: string
-          business_model?: string
+          ask_amount?: string | null
+          business_model?: string | null
           category?: string
           competition?: string | null
           created_at?: string
@@ -221,7 +221,7 @@ export type Database = {
           traction_revenue?: string | null
           traction_users?: string | null
           updated_at?: string
-          use_of_funds?: string
+          use_of_funds?: string | null
           user_id?: string
           website?: string | null
           why_now?: string | null
