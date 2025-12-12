@@ -2,8 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Copy, Download, Loader2, RefreshCw, Check, Sparkles } from "lucide-react";
+import { Copy, Download, Loader2, RefreshCw, Check, Sparkles, FileText, Lightbulb, Search, Users, BarChart3 } from "lucide-react";
+import { SmartGuidance } from "./SmartGuidance";
+import { CompetitorAnalysis } from "./CompetitorAnalysis";
+import { InvestorMatching } from "./InvestorMatching";
+import { FinancialModel } from "./FinancialModel";
+import { PitchDeckPDF } from "./PitchDeckPDF";
 
 interface Project {
   id: string;
@@ -11,6 +17,7 @@ interface Project {
   one_liner: string;
   category: string;
   stage: string;
+  website?: string | null;
   traction_users: string | null;
   traction_revenue: string | null;
   traction_growth: string | null;
@@ -23,6 +30,7 @@ interface Project {
   use_of_funds: string;
   business_model: string;
   pitch_tone: string | null;
+  go_to_market?: string | null;
 }
 
 interface PitchAsset {
@@ -187,30 +195,59 @@ export function PitchAssets({ project }: { project: Project }) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-2xl text-foreground">Pitch Assets</h2>
-          <p className="text-muted-foreground">
-            AI-generated materials based on your startup details
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={downloadAsText}>
-            <Download className="w-4 h-4 mr-2" />
-            Export All
-          </Button>
-          <Button
-            variant="coral"
-            size="sm"
-            onClick={generateAllAssets}
-            disabled={!!generating}
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Regenerate All
-          </Button>
-        </div>
-      </div>
+    <Tabs defaultValue="assets" className="space-y-6">
+      <TabsList className="bg-card border border-border p-1 rounded-xl flex-wrap h-auto">
+        <TabsTrigger value="assets" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg gap-2">
+          <FileText className="w-4 h-4" />
+          <span className="hidden sm:inline">Pitch Content</span>
+        </TabsTrigger>
+        <TabsTrigger value="deck" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg gap-2">
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Visual Deck</span>
+        </TabsTrigger>
+        <TabsTrigger value="guidance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg gap-2">
+          <Lightbulb className="w-4 h-4" />
+          <span className="hidden sm:inline">Guidance</span>
+        </TabsTrigger>
+        <TabsTrigger value="competitors" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg gap-2">
+          <Search className="w-4 h-4" />
+          <span className="hidden sm:inline">Competitors</span>
+        </TabsTrigger>
+        <TabsTrigger value="investors" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg gap-2">
+          <Users className="w-4 h-4" />
+          <span className="hidden sm:inline">Find Investors</span>
+        </TabsTrigger>
+        <TabsTrigger value="financials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg gap-2">
+          <BarChart3 className="w-4 h-4" />
+          <span className="hidden sm:inline">Financials</span>
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="assets">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display text-2xl text-foreground">Pitch Assets</h2>
+              <p className="text-muted-foreground">
+                AI-generated materials based on your startup details
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={downloadAsText}>
+                <Download className="w-4 h-4 mr-2" />
+                Export All
+              </Button>
+              <Button
+                variant="coral"
+                size="sm"
+                onClick={generateAllAssets}
+                disabled={!!generating}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Regenerate All
+              </Button>
+            </div>
+          </div>
 
       <div className="grid gap-6">
         {assetTypes.map(({ type, label, icon }) => {
@@ -316,7 +353,29 @@ export function PitchAssets({ project }: { project: Project }) {
             </div>
           );
         })}
+        </div>
       </div>
-    </div>
+      </TabsContent>
+
+      <TabsContent value="deck">
+        <PitchDeckPDF project={project} assets={assets} />
+      </TabsContent>
+
+      <TabsContent value="guidance">
+        <SmartGuidance project={project} />
+      </TabsContent>
+
+      <TabsContent value="competitors">
+        <CompetitorAnalysis project={project} />
+      </TabsContent>
+
+      <TabsContent value="investors">
+        <InvestorMatching project={project} />
+      </TabsContent>
+
+      <TabsContent value="financials">
+        <FinancialModel project={project} />
+      </TabsContent>
+    </Tabs>
   );
 }

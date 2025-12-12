@@ -1,1 +1,10 @@
 project_id = "swuzokjovmhhkwrshmvq"
+
+[functions.generate-pitch]
+verify_jwt = false
+
+[functions.pitch-feedback]
+verify_jwt = false
+
+[functions.ai-advisor]
+verify_jwt = false
