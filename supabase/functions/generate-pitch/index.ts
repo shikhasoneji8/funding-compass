@@ -174,10 +174,11 @@ Keep it under 280 characters (LinkedIn limit). Be personal, mention why you're r
       JSON.stringify({ content }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in generate-pitch:", error);
+    const message = error instanceof Error ? error.message : "Failed to generate pitch content";
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to generate pitch content" }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
