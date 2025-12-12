@@ -114,10 +114,11 @@ Return ONLY the JSON array, no other text.`;
       JSON.stringify({ feedback }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in pitch-feedback:", error);
+    const message = error instanceof Error ? error.message : "Failed to generate feedback";
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to generate feedback" }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
