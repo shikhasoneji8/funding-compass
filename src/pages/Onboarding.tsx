@@ -378,10 +378,13 @@ export default function Onboarding() {
               {renderField("linkedinUrl", "input", undefined, { placeholder: "linkedin.com/in/janesmith" })}
               {renderField("location", "input", undefined, { placeholder: "San Francisco, CA" })}
               {renderField("raisingStage", "select", [
+                { value: "idea-stage", label: "Idea Stage" },
                 { value: "pre-seed", label: "Pre-seed" },
                 { value: "seed", label: "Seed" },
                 { value: "series-a", label: "Series A" },
                 { value: "bootstrapping", label: "Bootstrapping" },
+                { value: "not-raising", label: "Not Raising" },
+                { value: "dont-know", label: "Don't know" },
               ], { placeholder: "What are you raising?" })}
               <div className="md:col-span-2">
                 {renderField("background", "textarea", undefined, { placeholder: "Your experience, domain expertise, and what drives you..." })}
