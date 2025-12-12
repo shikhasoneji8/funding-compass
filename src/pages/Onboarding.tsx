@@ -8,7 +8,7 @@ import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, User, Rocket, Lightbulb, DollarSign, Check } from "lucide-react";
+import { Loader2, User, Rocket, Lightbulb, DollarSign, Check, HelpCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,6 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface FormData {
   // Founder
@@ -89,10 +95,14 @@ const requiredFields: (keyof FormData)[] = [
   "problemStatement",
   "solutionDescription",
   "targetUsers",
-  "askAmount",
-  "useOfFunds",
-  "businessModel",
 ];
+
+const fieldTooltips: Partial<Record<keyof FormData, string>> = {
+  askAmount: "Typical ranges: Pre-seed $50K-$500K, Seed $500K-$2M, Series A $2M-$15M. Base on 12-18 months of runway.",
+  useOfFunds: "Common allocations: 40-60% Engineering/Product, 20-30% Sales/Marketing, 10-20% Operations. Be specific!",
+  businessModel: "Examples: SaaS subscription, Freemium, Marketplace fees, Transaction fees, Usage-based pricing, Licensing.",
+  goToMarket: "Describe your customer acquisition strategy: direct sales, content marketing, partnerships, PLG, etc.",
+};
 
 const fieldLabels: Record<keyof FormData, string> = {
   fullName: "Full Name",
@@ -267,6 +277,7 @@ export default function Onboarding() {
   ) => {
     const isRequired = requiredFields.includes(field);
     const hasError = !!errors[field];
+    const tooltip = fieldTooltips[field];
 
     return (
       <div
@@ -276,6 +287,18 @@ export default function Onboarding() {
         <Label htmlFor={field} className="flex items-center gap-1">
           {fieldLabels[field]}
           {isRequired && <span className="text-destructive">*</span>}
+          {tooltip && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help ml-1" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-sm">
+                  <p>{tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </Label>
         
         {type === "input" && (
