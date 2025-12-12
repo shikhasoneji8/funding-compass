@@ -149,6 +149,14 @@ export default function Onboarding() {
   const [activeStep, setActiveStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const formRefs = useRef<Record<string, HTMLElement | null>>({});
+  const sectionRefs = useRef<Record<number, HTMLElement | null>>({});
+
+  const handleStepClick = (stepId: number) => {
+    setActiveStep(stepId);
+    if (sectionRefs.current[stepId]) {
+      sectionRefs.current[stepId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -365,7 +373,7 @@ export default function Onboarding() {
           {steps.map((step, index) => (
             <button
               key={step.id}
-              onClick={() => setActiveStep(step.id)}
+              onClick={() => handleStepClick(step.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
                 activeStep === step.id
                   ? "bg-primary text-primary-foreground"
@@ -382,6 +390,7 @@ export default function Onboarding() {
         <div className="space-y-8">
           {/* Step 1: Founder */}
           <section
+            ref={(el) => (sectionRefs.current[1] = el)}
             className={`bg-card rounded-2xl border border-border p-6 md:p-8 transition-all ${
               activeStep === 1 ? "ring-2 ring-primary/20" : ""
             }`}
@@ -430,6 +439,7 @@ export default function Onboarding() {
 
           {/* Step 2: Startup */}
           <section
+            ref={(el) => (sectionRefs.current[2] = el)}
             className={`bg-card rounded-2xl border border-border p-6 md:p-8 transition-all ${
               activeStep === 2 ? "ring-2 ring-primary/20" : ""
             }`}
@@ -476,6 +486,7 @@ export default function Onboarding() {
 
           {/* Step 3: Problem & Solution */}
           <section
+            ref={(el) => (sectionRefs.current[3] = el)}
             className={`bg-card rounded-2xl border border-border p-6 md:p-8 transition-all ${
               activeStep === 3 ? "ring-2 ring-primary/20" : ""
             }`}
@@ -502,6 +513,7 @@ export default function Onboarding() {
 
           {/* Step 4: Funding */}
           <section
+            ref={(el) => (sectionRefs.current[4] = el)}
             className={`bg-card rounded-2xl border border-border p-6 md:p-8 transition-all ${
               activeStep === 4 ? "ring-2 ring-primary/20" : ""
             }`}
