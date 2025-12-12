@@ -151,12 +151,48 @@ export default function Onboarding() {
   const formRefs = useRef<Record<string, HTMLElement | null>>({});
   const sectionRefs = useRef<Record<number, HTMLElement | null>>({});
 
+  const [isScrolling, setIsScrolling] = useState(false);
+
   const handleStepClick = (stepId: number) => {
+    setIsScrolling(true);
     setActiveStep(stepId);
     if (sectionRefs.current[stepId]) {
       sectionRefs.current[stepId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Reset scrolling flag after animation completes
+      setTimeout(() => setIsScrolling(false), 500);
     }
   };
+
+  // Intersection Observer to track visible section
+  useEffect(() => {
+    const observers: IntersectionObserver[] = [];
+    
+    steps.forEach((step) => {
+      const section = sectionRefs.current[step.id];
+      if (!section) return;
+      
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting && !isScrolling) {
+              setActiveStep(step.id);
+            }
+          });
+        },
+        {
+          rootMargin: "-20% 0px -60% 0px",
+          threshold: 0,
+        }
+      );
+      
+      observer.observe(section);
+      observers.push(observer);
+    });
+    
+    return () => {
+      observers.forEach((observer) => observer.disconnect());
+    };
+  }, [isScrolling]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -367,24 +403,36 @@ export default function Onboarding() {
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8 max-w-4xl">
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {steps.map((step, index) => (
-            <button
-              key={step.id}
-              onClick={() => handleStepClick(step.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-                activeStep === step.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card border border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <step.icon className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm font-medium">{step.title}</span>
-            </button>
-          ))}
+      {/* Sticky Progress Steps */}
+      <div className="sticky top-[73px] z-40 bg-background/95 backdrop-blur-sm border-b border-border/50 py-3">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <div className="flex items-center justify-center gap-2">
+            {steps.map((step, index) => (
+              <button
+                key={step.id}
+                onClick={() => handleStepClick(step.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${
+                  activeStep === step.id
+                    ? "bg-primary text-primary-foreground shadow-md scale-105"
+                    : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+                }`}
+              >
+                <step.icon className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm font-medium">{step.title}</span>
+              </button>
+            ))}
+          </div>
+          {/* Progress bar */}
+          <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${(activeStep / steps.length) * 100}%` }}
+            />
+          </div>
         </div>
+      </div>
+
+      <div className="container mx-auto px-6 py-8 max-w-4xl">
 
         {/* Form Sections */}
         <div className="space-y-8">
