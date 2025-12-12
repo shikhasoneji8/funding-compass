@@ -8,7 +8,7 @@ import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, User, Rocket, Lightbulb, DollarSign, Check, HelpCircle } from "lucide-react";
+import { Loader2, User, Rocket, Lightbulb, DollarSign, Check, HelpCircle, CheckCircle2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -141,6 +141,14 @@ const steps = [
   { id: 4, title: "Funding", icon: DollarSign },
 ];
 
+// Map required fields to their respective steps
+const stepRequiredFields: Record<number, (keyof FormData)[]> = {
+  1: ["fullName", "email"],
+  2: ["startupName", "oneLiner", "category", "stage"],
+  3: ["problemStatement", "solutionDescription", "targetUsers"],
+  4: [], // No required fields in funding step
+};
+
 export default function Onboarding() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -212,6 +220,13 @@ export default function Onboarding() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  // Check if a step has all required fields completed
+  const isStepComplete = (stepId: number): boolean => {
+    const requiredForStep = stepRequiredFields[stepId];
+    if (!requiredForStep || requiredForStep.length === 0) return true;
+    return requiredForStep.every(field => formData[field]?.trim());
   };
 
   const validateForm = (): boolean => {
@@ -407,20 +422,34 @@ export default function Onboarding() {
       <div className="sticky top-[73px] z-40 bg-background/95 backdrop-blur-sm border-b border-border/50 py-3">
         <div className="container mx-auto px-6 max-w-4xl">
           <div className="flex items-center justify-center gap-2">
-            {steps.map((step, index) => (
-              <button
-                key={step.id}
-                onClick={() => handleStepClick(step.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${
-                  activeStep === step.id
-                    ? "bg-primary text-primary-foreground shadow-md scale-105"
-                    : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
-                }`}
-              >
-                <step.icon className="w-4 h-4" />
-                <span className="hidden sm:inline text-sm font-medium">{step.title}</span>
-              </button>
-            ))}
+            {steps.map((step, index) => {
+              const completed = isStepComplete(step.id);
+              const isActive = activeStep === step.id;
+              
+              return (
+                <button
+                  key={step.id}
+                  onClick={() => handleStepClick(step.id)}
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-md scale-105"
+                      : completed
+                        ? "bg-green-500/10 border border-green-500/50 text-green-600 hover:bg-green-500/20"
+                        : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+                  }`}
+                >
+                  {completed && !isActive ? (
+                    <CheckCircle2 className="w-4 h-4" />
+                  ) : (
+                    <step.icon className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline text-sm font-medium">{step.title}</span>
+                  {completed && isActive && (
+                    <CheckCircle2 className="w-3.5 h-3.5 ml-1" />
+                  )}
+                </button>
+              );
+            })}
           </div>
           {/* Progress bar */}
           <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
