@@ -7,7 +7,15 @@ import { cn } from "@/lib/utils";
 interface LocationSuggestion {
   display_name: string;
   place_id: number;
+  type?: string;
+  class?: string;
   address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+    state?: string;
+    country?: string;
     country_code?: string;
   };
 }
@@ -17,6 +25,25 @@ const getCountryFlag = (countryCode?: string): string => {
   const code = countryCode.toUpperCase();
   const offset = 127397;
   return String.fromCodePoint(...[...code].map(c => c.charCodeAt(0) + offset));
+};
+
+const formatLocationDisplay = (suggestion: LocationSuggestion): string => {
+  const addr = suggestion.address;
+  if (!addr) return suggestion.display_name;
+  
+  const city = addr.city || addr.town || addr.village || addr.municipality;
+  const state = addr.state;
+  const country = addr.country;
+  
+  if (city && state && country) {
+    return `${city}, ${state}, ${country}`;
+  } else if (city && country) {
+    return `${city}, ${country}`;
+  } else if (state && country) {
+    return `${state}, ${country}`;
+  }
+  
+  return suggestion.display_name;
 };
 
 interface LocationAutocompleteProps {
@@ -65,17 +92,50 @@ export function LocationAutocomplete({
 
     setIsLoading(true);
     try {
+      // Use featuretype=city to prioritize cities and add more results
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=8&addressdetails=1&featuretype=city`,
         {
           headers: {
             "Accept-Language": "en",
           },
         }
       );
-      const data = await response.json();
-      setSuggestions(data);
-      setIsOpen(data.length > 0);
+      let data: LocationSuggestion[] = await response.json();
+      
+      // If no city results, fallback to general search
+      if (data.length === 0) {
+        const fallbackResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=8&addressdetails=1`,
+          {
+            headers: {
+              "Accept-Language": "en",
+            },
+          }
+        );
+        data = await fallbackResponse.json();
+      }
+      
+      // Filter and sort to prioritize cities/towns over counties/regions
+      const prioritized = data.sort((a, b) => {
+        const aIsCity = a.address?.city || a.address?.town || a.address?.village;
+        const bIsCity = b.address?.city || b.address?.town || b.address?.village;
+        if (aIsCity && !bIsCity) return -1;
+        if (!aIsCity && bIsCity) return 1;
+        return 0;
+      });
+      
+      // Remove duplicates based on formatted display
+      const seen = new Set<string>();
+      const unique = prioritized.filter(item => {
+        const display = formatLocationDisplay(item);
+        if (seen.has(display)) return false;
+        seen.add(display);
+        return true;
+      }).slice(0, 6);
+      
+      setSuggestions(unique);
+      setIsOpen(unique.length > 0);
       setSelectedIndex(-1);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -100,20 +160,11 @@ export function LocationAutocomplete({
   };
 
   const handleSelect = (suggestion: LocationSuggestion) => {
-    const formattedLocation = formatLocation(suggestion.display_name);
+    const formattedLocation = formatLocationDisplay(suggestion);
     setQuery(formattedLocation);
     onChange(formattedLocation);
     setIsOpen(false);
     setSuggestions([]);
-  };
-
-  const formatLocation = (displayName: string) => {
-    // Extract city and country/state from the full address
-    const parts = displayName.split(", ");
-    if (parts.length >= 2) {
-      return `${parts[0]}, ${parts[parts.length - 1]}`;
-    }
-    return displayName;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -181,7 +232,7 @@ export function LocationAutocomplete({
                 <span className="text-lg shrink-0">
                   {getCountryFlag(suggestion.address?.country_code) || "🌍"}
                 </span>
-                <span className="line-clamp-1">{suggestion.display_name}</span>
+                <span className="line-clamp-1">{formatLocationDisplay(suggestion)}</span>
               </li>
             ))}
           </ul>
