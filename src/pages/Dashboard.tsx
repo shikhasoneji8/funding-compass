@@ -12,7 +12,8 @@ import {
   Users,
   MessageSquare,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  UserCheck
 } from "lucide-react";
 
 interface Project {
@@ -177,12 +178,20 @@ export default function Dashboard() {
         {/* Projects */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-xl text-foreground">Your Projects</h2>
-          <Link to="/onboarding">
-            <Button variant="coral" size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              New Project
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/investor-panel">
+              <Button variant="outline" size="sm" className="gap-2">
+                <UserCheck className="w-4 h-4" />
+                Investor Panel
+              </Button>
+            </Link>
+            <Link to="/onboarding">
+              <Button variant="coral" size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Project
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {projects.length === 0 ? (
