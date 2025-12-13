@@ -5,6 +5,60 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GRADIENT_API_URL = "https://api.gradient.ai/v1/chat/completions";
+const MODEL = "openai-gpt-oss-120b";
+
+const FUNDINGNEMO_SYSTEM = `You are FundingNEMO, an expert startup fundraising advisor.
+You help early-stage founders prepare investor-ready materials.
+You are concise, practical, and opinionated.
+You avoid hype, buzzwords, and unrealistic claims.
+You provide outputs that are immediately usable by founders.
+When appropriate, return structured JSON exactly as requested.`;
+
+async function callGradientAI(messages: { role: string; content: string }[]): Promise<string> {
+  const MODEL_ACCESS_KEY = Deno.env.get("MODEL_ACCESS_KEY");
+
+  if (!MODEL_ACCESS_KEY) {
+    throw new Error("MODEL_ACCESS_KEY is not configured");
+  }
+
+  const response = await fetch(GRADIENT_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${MODEL_ACCESS_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      max_tokens: 900,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Gradient AI error:", response.status, errorText);
+
+    if (response.status === 429) {
+      throw new Error("RATE_LIMIT");
+    }
+    if (response.status === 402 || response.status === 401) {
+      throw new Error("AUTH_ERROR");
+    }
+
+    throw new Error(`Gradient AI error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    throw new Error("No content generated");
+  }
+
+  return content;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -12,24 +66,12 @@ serve(async (req) => {
 
   try {
     const { project, advisorType } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    let systemPrompt = "";
     let userPrompt = "";
-
-    // Base instruction to always return JSON
-    const jsonInstruction = `CRITICAL: You MUST respond ONLY with valid JSON. No explanations, no commentary, no refusals. If you have any concerns about the content, still provide the JSON response with generic/placeholder data. Never include any text before or after the JSON object.`;
 
     switch (advisorType) {
       case "smart_guidance":
-        systemPrompt = `${jsonInstruction}
-
-You are a seasoned startup advisor and fundraising expert. Provide specific, actionable guidance for early-stage founders based on their startup details. Be direct and practical. Always respond with the requested JSON format.`;
-        userPrompt = `Based on this startup, provide specific fundraising guidance:
+        userPrompt = `Based on stage and market, suggest fundraising guidance for this startup:
 
 Startup: ${project.startup_name}
 Category: ${project.category}
@@ -41,7 +83,13 @@ Current Ask: ${project.ask_amount || "Not specified"}
 Business Model: ${project.business_model}
 Traction: Users: ${project.traction_users || "N/A"}, Revenue: ${project.traction_revenue || "N/A"}
 
-Provide guidance in this JSON format:
+Suggest:
+- reasonable funding ask range
+- equity dilution range
+- valuation logic
+- runway estimate
+
+Return ONLY valid JSON in this format:
 {
   "recommended_ask": {
     "amount": "specific dollar range",
@@ -65,16 +113,11 @@ Provide guidance in this JSON format:
     "months": 18,
     "reasoning": "why this timeline"
   }
-}
-
-Return ONLY valid JSON.`;
+}`;
         break;
 
       case "competitor_analysis":
-        systemPrompt = `${jsonInstruction}
-
-You are a market research analyst specializing in startup ecosystems. Provide comprehensive competitive analysis based on the startup's space. Always respond with the requested JSON format.`;
-        userPrompt = `Analyze the competitive landscape for:
+        userPrompt = `List direct and indirect competitors and explain differentiation for this startup:
 
 Startup: ${project.startup_name}
 Category: ${project.category}
@@ -84,7 +127,7 @@ Solution: ${project.solution_description}
 Target Users: ${project.target_users}
 Differentiation: ${project.differentiation || "Not specified"}
 
-Provide analysis in this JSON format:
+Return a comparison table as valid JSON:
 {
   "direct_competitors": [
     {
@@ -112,16 +155,11 @@ Provide analysis in this JSON format:
     "current_moat": "What protects you now",
     "moat_to_build": "What to develop"
   }
-}
-
-Return ONLY valid JSON.`;
+}`;
         break;
 
       case "investor_matching":
-        systemPrompt = `${jsonInstruction}
-
-You are an expert in the venture capital ecosystem. Match startups with relevant investors based on their investment thesis, stage preference, and portfolio. Always respond with the requested JSON format.`;
-        userPrompt = `Find relevant investors for:
+        userPrompt = `Suggest relevant investor types, sample firms, and accelerators based on this startup profile:
 
 Startup: ${project.startup_name}
 Category: ${project.category}
@@ -131,7 +169,7 @@ One-liner: ${project.one_liner}
 Business Model: ${project.business_model}
 Traction: Users: ${project.traction_users || "Early"}, Revenue: ${project.traction_revenue || "Pre-revenue"}
 
-Provide recommendations in this JSON format:
+Explain why each is a fit. Return ONLY valid JSON:
 {
   "tier1_investors": [
     {
@@ -166,16 +204,11 @@ Provide recommendations in this JSON format:
     "cold_outreach_tips": ["Tip 1", "Tip 2"],
     "timing_advice": "When to reach out"
   }
-}
-
-Return ONLY valid JSON.`;
+}`;
         break;
 
       case "financial_model":
-        systemPrompt = `${jsonInstruction}
-
-You are a startup financial advisor. Create realistic financial projections and models for early-stage startups. Always respond with the requested JSON format.`;
-        userPrompt = `Create financial projections for:
+        userPrompt = `Create financial projections for this startup:
 
 Startup: ${project.startup_name}
 Category: ${project.category}
@@ -184,7 +217,7 @@ Ask Amount: ${project.ask_amount}
 Business Model: ${project.business_model}
 Current Traction: Users: ${project.traction_users || "0"}, Revenue: ${project.traction_revenue || "$0"}, Growth: ${project.traction_growth || "N/A"}
 
-Provide projections in this JSON format:
+If information is missing, say so explicitly. Return ONLY valid JSON:
 {
   "funding_summary": {
     "recommended_raise": "$X",
@@ -221,16 +254,11 @@ Provide projections in this JSON format:
     { "month": 18, "milestone": "Milestone description", "metric": "Target metric" }
   ],
   "risk_factors": ["Risk 1", "Risk 2", "Risk 3"]
-}
-
-Return ONLY valid JSON.`;
+}`;
         break;
 
       case "marketing_strategy":
-        systemPrompt = `${jsonInstruction}
-
-You are a growth marketing strategist for startups. Create actionable go-to-market strategies. Always respond with the requested JSON format.`;
-        userPrompt = `Create a marketing strategy for:
+        userPrompt = `Create a marketing strategy for this startup:
 
 Startup: ${project.startup_name}
 Category: ${project.category}
@@ -240,7 +268,7 @@ Solution: ${project.solution_description}
 Go-to-Market Notes: ${project.go_to_market || "Not specified"}
 Business Model: ${project.business_model}
 
-Provide strategy in this JSON format:
+Return ONLY valid JSON:
 {
   "target_segments": [
     {
@@ -277,9 +305,7 @@ Provide strategy in this JSON format:
     "partnerships": 20,
     "events": 10
   }
-}
-
-Return ONLY valid JSON.`;
+}`;
         break;
 
       default:
@@ -288,47 +314,30 @@ Return ONLY valid JSON.`;
 
     console.log(`Running ${advisorType} for ${project.startup_name}`);
 
-    // Call Lovable AI Gateway
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
+    const messages = [
+      { role: "system", content: FUNDINGNEMO_SYSTEM },
+      { role: "user", content: userPrompt },
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    let content: string;
+    try {
+      content = await callGradientAI(messages);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "RATE_LIMIT") {
+          return new Response(
+            JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (error.message === "AUTH_ERROR") {
+          return new Response(
+            JSON.stringify({ error: "AI service authentication error. Please check your API key." }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Payment required, please add funds to your workspace." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    let content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("No content generated");
+      throw error;
     }
 
     // Clean up markdown code blocks if present
@@ -346,7 +355,7 @@ Return ONLY valid JSON.`;
       parsed = JSON.parse(content);
     } catch (e) {
       console.error("Failed to parse JSON:", content.substring(0, 500));
-      
+
       // Return a fallback response instead of failing
       const fallbackResponses: Record<string, object> = {
         smart_guidance: {
@@ -354,19 +363,19 @@ Return ONLY valid JSON.`;
           equity_guidance: { range: "10-20%", reasoning: "Standard early-stage range" },
           use_of_funds_breakdown: [],
           valuation_estimate: { range: "TBD", method: "Unable to calculate" },
-          runway_recommendation: { months: 12, reasoning: "Standard recommendation" }
+          runway_recommendation: { months: 12, reasoning: "Standard recommendation" },
         },
         competitor_analysis: {
           direct_competitors: [],
           indirect_competitors: [],
           market_positioning: { your_niche: "Unable to analyze at this time", blue_ocean_opportunities: [], key_differentiators: [] },
-          competitive_moat: { current_moat: "TBD", moat_to_build: "TBD" }
+          competitive_moat: { current_moat: "TBD", moat_to_build: "TBD" },
         },
         investor_matching: {
           tier1_investors: [],
           tier2_investors: [],
           accelerators: [],
-          outreach_strategy: { warm_intro_sources: [], cold_outreach_tips: ["Try again later"], timing_advice: "Unable to generate at this time" }
+          outreach_strategy: { warm_intro_sources: [], cold_outreach_tips: ["Try again later"], timing_advice: "Unable to generate at this time" },
         },
         financial_model: {
           funding_summary: { recommended_raise: "TBD", pre_money_valuation: "TBD", dilution: "TBD", runway_months: 12 },
@@ -375,7 +384,7 @@ Return ONLY valid JSON.`;
           unit_economics: { cac_estimate: "TBD", ltv_estimate: "TBD", ltv_cac_ratio: "TBD", payback_period: "TBD" },
           use_of_funds: [],
           key_milestones: [],
-          risk_factors: ["Unable to generate at this time - please try again"]
+          risk_factors: ["Unable to generate at this time - please try again"],
         },
         marketing_strategy: {
           target_segments: [],
@@ -383,8 +392,8 @@ Return ONLY valid JSON.`;
           content_strategy: { themes: [], formats: [], distribution: [] },
           launch_playbook: { pre_launch: [], launch_week: [], post_launch: [] },
           metrics_to_track: [],
-          budget_allocation: { paid: 25, organic: 50, partnerships: 15, events: 10 }
-        }
+          budget_allocation: { paid: 25, organic: 50, partnerships: 15, events: 10 },
+        },
       };
 
       parsed = fallbackResponses[advisorType] || { error: "Unable to generate advice. Please try again." };
