@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, TrendingUp, DollarSign, Target, BarChart3, AlertTriangle } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
+import { generateAI, buildFinancialModelPrompt } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -61,16 +61,23 @@ export function FinancialModel({ project }: { project: Project }) {
   const generateModel = async () => {
     setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("ai-advisor", {
-        body: { project, advisorType: "financial_model" },
-      });
-
-      if (error) throw error;
-      setData(result.data);
+      const messages = buildFinancialModelPrompt(project as unknown as Record<string, unknown>);
+      const response = await generateAI({ messages });
+      
+      if (response.json) {
+        setData(response.json as unknown as FinancialData);
+      } else if (response.text) {
+        const parsed = JSON.parse(response.text);
+        setData(parsed);
+      } else {
+        throw new Error("No financial model generated");
+      }
+      
       toast.success("Financial model generated!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error:", error);
-      toast.error(error.message || "Failed to generate financial model");
+      const message = error instanceof Error ? error.message : "Failed to generate financial model";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

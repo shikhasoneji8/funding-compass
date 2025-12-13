@@ -10,6 +10,7 @@ import { CompetitorAnalysis } from "./CompetitorAnalysis";
 import { InvestorMatching } from "./InvestorMatching";
 import { FinancialModel } from "./FinancialModel";
 import { PitchDeckPDF } from "./PitchDeckPDF";
+import { generateAI, getPromptForAssetType } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -85,14 +86,21 @@ export function PitchAssets({ project }: { project: Project }) {
     setGenerating(assetType);
     
     try {
-      const { data, error } = await supabase.functions.invoke("generate-pitch", {
-        body: {
-          project,
-          assetType,
-        },
-      });
-
-      if (error) throw error;
+      // Build prompt for this asset type
+      const messages = getPromptForAssetType(assetType, project as unknown as Record<string, unknown>);
+      
+      // Call Gradient AI via backend
+      const response = await generateAI({ messages });
+      
+      // Get content - either JSON stringified or text
+      let content: string;
+      if (response.json) {
+        content = JSON.stringify(response.json, null, 2);
+      } else if (response.text) {
+        content = response.text;
+      } else {
+        throw new Error("No content generated");
+      }
 
       const existingAsset = assets.find(a => a.asset_type === assetType);
       
@@ -100,14 +108,14 @@ export function PitchAssets({ project }: { project: Project }) {
         // Update existing
         const { error: updateError } = await supabase
           .from("pitch_assets")
-          .update({ content: data.content })
+          .update({ content })
           .eq("id", existingAsset.id);
 
         if (updateError) throw updateError;
         
         setAssets(prev =>
           prev.map(a =>
-            a.id === existingAsset.id ? { ...a, content: data.content } : a
+            a.id === existingAsset.id ? { ...a, content } : a
           )
         );
       } else {
@@ -117,7 +125,7 @@ export function PitchAssets({ project }: { project: Project }) {
           .insert({
             project_id: project.id,
             asset_type: assetType,
-            content: data.content,
+            content,
           })
           .select()
           .single();
@@ -127,9 +135,10 @@ export function PitchAssets({ project }: { project: Project }) {
       }
 
       toast.success("Generated successfully!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating:", error);
-      toast.error(error.message || "Failed to generate. Please try again.");
+      const message = error instanceof Error ? error.message : "Failed to generate";
+      toast.error(message);
     } finally {
       setGenerating(null);
     }
@@ -162,7 +171,7 @@ export function PitchAssets({ project }: { project: Project }) {
       );
       setEditingAsset(null);
       toast.success("Saved!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Failed to save");
     }
   };

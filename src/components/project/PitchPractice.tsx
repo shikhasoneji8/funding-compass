@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Mic, Play, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { generateAI, buildPitchFeedbackPrompt } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -83,19 +83,46 @@ export function PitchPractice({ project }: { project: Project }) {
     setFeedback(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("pitch-feedback", {
-        body: {
-          project,
-          promptType: selectedPrompt.id,
-          userPitch,
-        },
-      });
-
-      if (error) throw error;
-      setFeedback(data.feedback);
-    } catch (error: any) {
+      const messages = buildPitchFeedbackPrompt(
+        project as unknown as Record<string, unknown>,
+        selectedPrompt.id,
+        userPitch
+      );
+      
+      const response = await generateAI({ messages });
+      
+      let parsedFeedback: FeedbackItem[];
+      
+      if (response.json) {
+        const data = response.json as { feedback?: FeedbackItem[]; score?: number; strengths?: string[]; weaknesses?: string[]; rewrite_suggestion?: string };
+        if (data.feedback) {
+          parsedFeedback = data.feedback;
+        } else {
+          // Convert structured response to feedback format
+          parsedFeedback = [
+            { category: "Overall Score", score: (data.score ?? 0) >= 7 ? "good" : (data.score ?? 0) >= 4 ? "needs_work" : "missing", feedback: `Score: ${data.score}/10` },
+            { category: "Strengths", score: "good", feedback: data.strengths?.join(". ") || "See detailed feedback" },
+            { category: "Areas to Improve", score: "needs_work", feedback: data.weaknesses?.join(". ") || "See detailed feedback" },
+            { category: "Suggested Rewrite", score: "good", feedback: data.rewrite_suggestion || "No rewrite provided" },
+          ];
+        }
+      } else if (response.text) {
+        const parsed = JSON.parse(response.text);
+        parsedFeedback = parsed.feedback || [
+          { category: "Overall Score", score: parsed.score >= 7 ? "good" : parsed.score >= 4 ? "needs_work" : "missing", feedback: `Score: ${parsed.score}/10` },
+          { category: "Strengths", score: "good", feedback: parsed.strengths?.join(". ") || "See detailed feedback" },
+          { category: "Areas to Improve", score: "needs_work", feedback: parsed.weaknesses?.join(". ") || "See detailed feedback" },
+          { category: "Suggested Rewrite", score: "good", feedback: parsed.rewrite_suggestion || "No rewrite provided" },
+        ];
+      } else {
+        throw new Error("No feedback generated");
+      }
+      
+      setFeedback(parsedFeedback);
+    } catch (error: unknown) {
       console.error("Error getting feedback:", error);
-      toast.error(error.message || "Failed to get feedback. Please try again.");
+      const message = error instanceof Error ? error.message : "Failed to get feedback";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Search, Shield, Swords, Target } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
+import { generateAI, buildCompetitorAnalysisPrompt } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -48,16 +48,23 @@ export function CompetitorAnalysis({ project }: { project: Project }) {
   const generateAnalysis = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-advisor", {
-        body: { project, advisorType: "competitor_analysis" },
-      });
-
-      if (error) throw error;
-      setAnalysis(data.data);
+      const messages = buildCompetitorAnalysisPrompt(project as unknown as Record<string, unknown>);
+      const response = await generateAI({ messages });
+      
+      if (response.json) {
+        setAnalysis(response.json as unknown as CompetitorData);
+      } else if (response.text) {
+        const parsed = JSON.parse(response.text);
+        setAnalysis(parsed);
+      } else {
+        throw new Error("No analysis generated");
+      }
+      
       toast.success("Competitor analysis complete!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error:", error);
-      toast.error(error.message || "Failed to analyze competitors");
+      const message = error instanceof Error ? error.message : "Failed to analyze competitors";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Sparkles, DollarSign, PieChart, Target, TrendingUp } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
+import { generateAI, buildSmartGuidancePrompt } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -51,16 +51,24 @@ export function SmartGuidance({ project }: { project: Project }) {
   const generateGuidance = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-advisor", {
-        body: { project, advisorType: "smart_guidance" },
-      });
-
-      if (error) throw error;
-      setGuidance(data.data);
+      const messages = buildSmartGuidancePrompt(project as unknown as Record<string, unknown>);
+      const response = await generateAI({ messages });
+      
+      if (response.json) {
+        setGuidance(response.json as unknown as GuidanceData);
+      } else if (response.text) {
+        // Try to parse text as JSON
+        const parsed = JSON.parse(response.text);
+        setGuidance(parsed);
+      } else {
+        throw new Error("No guidance generated");
+      }
+      
       toast.success("Guidance generated!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error:", error);
-      toast.error(error.message || "Failed to generate guidance");
+      const message = error instanceof Error ? error.message : "Failed to generate guidance";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
