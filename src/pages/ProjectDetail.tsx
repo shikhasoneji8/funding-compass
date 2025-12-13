@@ -12,7 +12,8 @@ import {
   FileText,
   Users,
   Target,
-  BookOpen
+  BookOpen,
+  UserCheck
 } from "lucide-react";
 import { PitchAssets } from "@/components/project/PitchAssets";
 import { InvestorCRM } from "@/components/project/InvestorCRM";
@@ -117,6 +118,12 @@ export default function ProjectDetail() {
             <Logo size="sm" />
           </div>
           <div className="flex items-center gap-4">
+            <Link to="/investor-panel">
+              <Button variant="outline" size="sm" className="gap-2 hidden sm:flex">
+                <UserCheck className="w-4 h-4" />
+                Investor Panel
+              </Button>
+            </Link>
             <span className="text-sm text-muted-foreground hidden sm:block">
               {user?.email}
             </span>
