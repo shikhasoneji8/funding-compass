@@ -121,7 +121,7 @@ export default function ProjectDetail() {
             <Link to="/investor-panel">
               <Button variant="outline" size="sm" className="gap-2 hidden sm:flex">
                 <UserCheck className="w-4 h-4" />
-                Investor Panel
+                Once Upon a Pitch
               </Button>
             </Link>
             <span className="text-sm text-muted-foreground hidden sm:block">
