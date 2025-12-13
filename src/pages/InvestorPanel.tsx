@@ -452,7 +452,7 @@ export default function InvestorPanel() {
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-display text-3xl text-foreground">Investor Panel</h1>
+            <h1 className="font-display text-3xl text-foreground">Once Upon a Pitch</h1>
             <p className="text-muted-foreground">
               Get feedback from a simulated panel of investor personas
             </p>

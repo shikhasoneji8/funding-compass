@@ -182,7 +182,7 @@ export default function Dashboard() {
             <Link to="/investor-panel">
               <Button variant="outline" size="sm" className="gap-2">
                 <UserCheck className="w-4 h-4" />
-                Investor Panel
+                Once Upon a Pitch
               </Button>
             </Link>
             <Link to="/onboarding">
