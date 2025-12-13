@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -38,8 +39,6 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { jsPDF } from 'jspdf';
-
-const FLASK_API_URL = import.meta.env.VITE_FLASK_API_URL || '';
 
 const emptyProfile: StartupProfile = {
   startupName: '',
@@ -138,10 +137,8 @@ export default function InvestorPanel() {
     setFinalReport(null);
 
     try {
-      const response = await fetch(`${FLASK_API_URL}/investor-panel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('investor-panel', {
+        body: {
           profile,
           settings,
           personas: enabledPersonas.map(p => ({
@@ -151,26 +148,29 @@ export default function InvestorPanel() {
             systemPrompt: p.systemPrompt,
             voiceStyle: p.voiceStyle
           }))
-        })
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to run investor panel');
+      if (error) {
+        throw new Error(error.message || 'Failed to run investor panel');
       }
 
-      const data: InvestorPanelResponse = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const responseData = data as InvestorPanelResponse;
       
       // Simulate phased reveal for better UX
-      setReviews(data.reviews);
+      setReviews(responseData.reviews);
       setPhase('discussion');
       
       await new Promise(r => setTimeout(r, 500));
-      setDiscussion(data.discussion);
+      setDiscussion(responseData.discussion);
       setPhase('final');
       
       await new Promise(r => setTimeout(r, 500));
-      setFinalReport(data.finalReport);
+      setFinalReport(responseData.finalReport);
       setPhase('complete');
       
       toast.success('Panel complete! View your results below.');
@@ -184,10 +184,8 @@ export default function InvestorPanel() {
   };
 
   const handleFollowUp = async (question: string): Promise<string> => {
-    const response = await fetch(`${FLASK_API_URL}/investor-panel-followup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('investor-panel-followup', {
+      body: {
         question,
         profile,
         personas: enabledPersonas.map(p => ({
@@ -195,14 +193,13 @@ export default function InvestorPanel() {
           displayName: p.displayName,
           systemPrompt: p.systemPrompt
         }))
-      })
+      }
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to get follow-up response');
+    if (error || data.error) {
+      throw new Error(error?.message || data.error || 'Failed to get follow-up response');
     }
 
-    const data = await response.json();
     return data.response;
   };
 
