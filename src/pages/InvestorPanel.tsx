@@ -38,7 +38,28 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
 import { jsPDF } from 'jspdf';
+
+interface Project {
+  id: string;
+  startup_name: string;
+  one_liner: string;
+  problem_statement: string;
+  solution_description: string;
+  target_users: string;
+  business_model: string | null;
+  traction_users: string | null;
+  traction_revenue: string | null;
+  traction_growth: string | null;
+  team_size: string | null;
+  differentiation: string | null;
+  competition: string | null;
+  ask_amount: string | null;
+  use_of_funds: string | null;
+  why_now: string | null;
+}
 
 const emptyProfile: StartupProfile = {
   startupName: '',
@@ -65,6 +86,10 @@ export default function InvestorPanel() {
   const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  
   const [profile, setProfile] = useState<StartupProfile>(emptyProfile);
   const [settings, setSettings] = useState<PanelSettings>(defaultSettings);
   const [personas, setPersonas] = useState<InvestorPersona[]>(investorPersonas);
@@ -81,6 +106,74 @@ export default function InvestorPanel() {
       navigate('/login');
     }
   }, [user, authLoading, navigate]);
+
+  // Fetch user's projects
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    }
+  }, [user]);
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProjects(data || []);
+      
+      // Auto-select first project if available
+      if (data && data.length > 0) {
+        handleProjectSelect(data[0].id, data);
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
+  const handleProjectSelect = (projectId: string, projectList?: Project[]) => {
+    setSelectedProjectId(projectId);
+    
+    if (projectId === 'manual') {
+      setProfile(emptyProfile);
+      return;
+    }
+    
+    const projectData = (projectList || projects).find(p => p.id === projectId);
+    if (!projectData) return;
+
+    // Build traction string from components
+    const tractionParts = [];
+    if (projectData.traction_users) tractionParts.push(`Users: ${projectData.traction_users}`);
+    if (projectData.traction_revenue) tractionParts.push(`Revenue: ${projectData.traction_revenue}`);
+    if (projectData.traction_growth) tractionParts.push(`Growth: ${projectData.traction_growth}`);
+
+    // Build fundraising goal
+    const fundingParts = [];
+    if (projectData.ask_amount) fundingParts.push(projectData.ask_amount);
+    if (projectData.use_of_funds) fundingParts.push(`Use: ${projectData.use_of_funds}`);
+
+    setProfile({
+      startupName: projectData.startup_name,
+      oneLiner: projectData.one_liner,
+      problem: projectData.problem_statement,
+      solution: projectData.solution_description,
+      targetCustomer: projectData.target_users,
+      businessModel: projectData.business_model || '',
+      traction: tractionParts.join('. ') || '',
+      team: projectData.team_size ? `Team size: ${projectData.team_size}` : '',
+      moat: projectData.differentiation || '',
+      competitors: projectData.competition || '',
+      fundraisingGoal: fundingParts.join('. ') || '',
+      extraNotes: projectData.why_now ? `Why now: ${projectData.why_now}` : ''
+    });
+
+    toast.success(`Loaded "${projectData.startup_name}" details`);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -390,6 +483,41 @@ export default function InvestorPanel() {
           </TabsList>
 
           <TabsContent value="input" className="space-y-6">
+            {/* Project Selector */}
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-foreground mb-2 block">
+                      Load from existing project
+                    </label>
+                    <Select
+                      value={selectedProjectId}
+                      onValueChange={(value) => handleProjectSelect(value)}
+                      disabled={projectsLoading}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={projectsLoading ? "Loading projects..." : "Select a project"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">Enter manually</SelectItem>
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.startup_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedProjectId && selectedProjectId !== 'manual' 
+                      ? 'Project data loaded. You can still edit below.'
+                      : 'Or fill in the form manually below.'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
             <StartupInputForm
               profile={profile}
               settings={settings}
