@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Sparkles, DollarSign, PieChart, Target, TrendingUp } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
-import { generateAI, buildSmartGuidancePrompt } from "@/lib/aiClient";
+import { callAdvisor } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -51,8 +51,7 @@ export function SmartGuidance({ project }: { project: Project }) {
   const generateGuidance = async () => {
     setLoading(true);
     try {
-      const messages = buildSmartGuidancePrompt(project as unknown as Record<string, unknown>);
-      const response = await generateAI({ messages });
+      const response = await callAdvisor('smart_guidance', project as unknown as Record<string, unknown>);
       
       if (response.json) {
         setGuidance(response.json as unknown as GuidanceData);

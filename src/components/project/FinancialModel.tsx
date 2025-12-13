@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, TrendingUp, DollarSign, Target, BarChart3, AlertTriangle } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
-import { generateAI, buildFinancialModelPrompt } from "@/lib/aiClient";
+import { callAdvisor } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -61,8 +61,7 @@ export function FinancialModel({ project }: { project: Project }) {
   const generateModel = async () => {
     setLoading(true);
     try {
-      const messages = buildFinancialModelPrompt(project as unknown as Record<string, unknown>);
-      const response = await generateAI({ messages });
+      const response = await callAdvisor('financial_model', project as unknown as Record<string, unknown>);
       
       if (response.json) {
         setData(response.json as unknown as FinancialData);

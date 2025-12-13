@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Mic, Play, CheckCircle, AlertCircle, Info } from "lucide-react";
-import { generateAI, buildPitchFeedbackPrompt } from "@/lib/aiClient";
+import { getPitchFeedback } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -83,13 +83,11 @@ export function PitchPractice({ project }: { project: Project }) {
     setFeedback(null);
 
     try {
-      const messages = buildPitchFeedbackPrompt(
+      const response = await getPitchFeedback(
         project as unknown as Record<string, unknown>,
         selectedPrompt.id,
         userPitch
       );
-      
-      const response = await generateAI({ messages });
       
       let parsedFeedback: FeedbackItem[];
       
