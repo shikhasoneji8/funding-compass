@@ -1,8 +1,10 @@
 /**
  * AI Client for FundingNEMO
- * Routes all AI calls through the secure backend API (Gradient AI)
+ * Routes all AI calls through Supabase Edge Functions (Gradient AI)
  * Never exposes API keys to the frontend
  */
+
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -21,34 +23,85 @@ interface GenerateResponse {
   error?: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
-
 /**
- * Call the Gradient AI backend to generate content
+ * Call the generate-pitch edge function
  */
-export async function generateAI(options: GenerateOptions): Promise<GenerateResponse> {
-  const response = await fetch(`${API_BASE}/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messages: options.messages,
-      model: options.model,
-      max_tokens: options.max_tokens,
-    }),
+export async function generatePitchAsset(
+  projectId: string,
+  assetType: string,
+  project: Record<string, unknown>
+): Promise<GenerateResponse> {
+  const { data, error } = await supabase.functions.invoke('generate-pitch', {
+    body: { projectId, assetType, project },
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `API error: ${response.status}`);
+  if (error) {
+    throw new Error(error.message || 'Failed to generate pitch asset');
   }
 
-  return response.json();
+  return data;
+}
+
+/**
+ * Call the ai-advisor edge function
+ */
+export async function callAdvisor(
+  advisorType: string,
+  project: Record<string, unknown>
+): Promise<GenerateResponse> {
+  const { data, error } = await supabase.functions.invoke('ai-advisor', {
+    body: { advisorType, project },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to get advisor response');
+  }
+
+  return data;
+}
+
+/**
+ * Call the pitch-feedback edge function
+ */
+export async function getPitchFeedback(
+  project: Record<string, unknown>,
+  pitchType: string,
+  userPitch: string
+): Promise<GenerateResponse> {
+  const { data, error } = await supabase.functions.invoke('pitch-feedback', {
+    body: { project, pitchType, userPitch },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to get pitch feedback');
+  }
+
+  return data;
+}
+
+/**
+ * Generic AI generate function (uses generate-pitch with custom messages)
+ */
+export async function generateAI(options: GenerateOptions): Promise<GenerateResponse> {
+  // Use the generate-pitch function with a generic approach
+  const { data, error } = await supabase.functions.invoke('generate-pitch', {
+    body: { 
+      projectId: 'generic',
+      assetType: 'custom',
+      messages: options.messages,
+      max_tokens: options.max_tokens
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to generate content');
+  }
+
+  return data;
 }
 
 // ============================================
-// PITCH ASSET PROMPTS
+// PITCH ASSET PROMPTS (kept for reference/direct use)
 // ============================================
 
 export function buildTaglinePrompt(project: Record<string, unknown>): Message[] {

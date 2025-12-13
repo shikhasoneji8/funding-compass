@@ -10,7 +10,7 @@ import { CompetitorAnalysis } from "./CompetitorAnalysis";
 import { InvestorMatching } from "./InvestorMatching";
 import { FinancialModel } from "./FinancialModel";
 import { PitchDeckPDF } from "./PitchDeckPDF";
-import { generateAI, getPromptForAssetType } from "@/lib/aiClient";
+import { generatePitchAsset } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -86,11 +86,12 @@ export function PitchAssets({ project }: { project: Project }) {
     setGenerating(assetType);
     
     try {
-      // Build prompt for this asset type
-      const messages = getPromptForAssetType(assetType, project as unknown as Record<string, unknown>);
-      
-      // Call Gradient AI via backend
-      const response = await generateAI({ messages });
+      // Call Gradient AI via edge function
+      const response = await generatePitchAsset(
+        project.id, 
+        assetType, 
+        project as unknown as Record<string, unknown>
+      );
       
       // Get content - either JSON stringified or text
       let content: string;

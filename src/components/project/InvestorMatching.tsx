@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Users, Star, Building2, Rocket, Plus } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
-import { generateAI, buildInvestorMatchingPrompt } from "@/lib/aiClient";
+import { callAdvisor } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -59,8 +59,7 @@ export function InvestorMatching({ project, onAddInvestor }: InvestorMatchingPro
   const generateMatches = async () => {
     setLoading(true);
     try {
-      const messages = buildInvestorMatchingPrompt(project as unknown as Record<string, unknown>);
-      const response = await generateAI({ messages });
+      const response = await callAdvisor('investor_matching', project as unknown as Record<string, unknown>);
       
       if (response.json) {
         setData(response.json as unknown as InvestorData);
