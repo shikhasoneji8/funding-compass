@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Users, Star, Building2, Rocket, Plus } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
+import { generateAI, buildInvestorMatchingPrompt } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -59,16 +59,23 @@ export function InvestorMatching({ project, onAddInvestor }: InvestorMatchingPro
   const generateMatches = async () => {
     setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("ai-advisor", {
-        body: { project, advisorType: "investor_matching" },
-      });
-
-      if (error) throw error;
-      setData(result.data);
+      const messages = buildInvestorMatchingPrompt(project as unknown as Record<string, unknown>);
+      const response = await generateAI({ messages });
+      
+      if (response.json) {
+        setData(response.json as unknown as InvestorData);
+      } else if (response.text) {
+        const parsed = JSON.parse(response.text);
+        setData(parsed);
+      } else {
+        throw new Error("No investor matches generated");
+      }
+      
       toast.success("Investor matches found!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error:", error);
-      toast.error(error.message || "Failed to find investors");
+      const message = error instanceof Error ? error.message : "Failed to find investors";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
