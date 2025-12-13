@@ -5,6 +5,60 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GRADIENT_API_URL = "https://api.gradient.ai/v1/chat/completions";
+const MODEL = "openai-gpt-oss-120b";
+
+const FUNDINGNEMO_SYSTEM = `You are FundingNEMO, an expert startup fundraising advisor.
+You help early-stage founders prepare investor-ready materials.
+You are concise, practical, and opinionated.
+You avoid hype, buzzwords, and unrealistic claims.
+You provide outputs that are immediately usable by founders.
+When appropriate, return structured JSON exactly as requested.`;
+
+async function callGradientAI(messages: { role: string; content: string }[]): Promise<string> {
+  const MODEL_ACCESS_KEY = Deno.env.get("MODEL_ACCESS_KEY");
+
+  if (!MODEL_ACCESS_KEY) {
+    throw new Error("MODEL_ACCESS_KEY is not configured");
+  }
+
+  const response = await fetch(GRADIENT_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${MODEL_ACCESS_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      max_tokens: 900,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Gradient AI error:", response.status, errorText);
+
+    if (response.status === 429) {
+      throw new Error("RATE_LIMIT");
+    }
+    if (response.status === 402 || response.status === 401) {
+      throw new Error("AUTH_ERROR");
+    }
+
+    throw new Error(`Gradient AI error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    throw new Error("No content generated");
+  }
+
+  return content;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -12,29 +66,11 @@ serve(async (req) => {
 
   try {
     const { project, promptType, userPitch } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    const systemPrompt = `You are an expert pitch coach who has helped hundreds of startups raise funding. 
-Analyze the user's pitch attempt and provide constructive feedback.
-
-IMPORTANT: Return your response as a valid JSON array of feedback items. Each item should have:
-- category: string (e.g., "Clarity", "Hook", "Specificity", "Traction", "Ask")
-- score: "good" | "needs_work" | "missing"
-- feedback: string (1-2 sentences of specific, actionable advice)
-
-Example format:
-[
-  {"category": "Hook", "score": "good", "feedback": "Strong opening that immediately captures attention."},
-  {"category": "Specificity", "score": "needs_work", "feedback": "Add specific numbers to make your claims more credible."}
-]`;
-
-    const userPrompt = `Evaluate this ${promptType} pitch for a startup called "${project.startup_name}":
+    const userPrompt = `Score this pitch on clarity, credibility, and conciseness (1–10).
 
 Company context:
+- Name: ${project.startup_name}
 - One-liner: ${project.one_liner}
 - Problem: ${project.problem_statement}
 - Solution: ${project.solution_description}
@@ -42,57 +78,62 @@ Company context:
 - Traction: ${project.traction_users || "Not specified"} users, ${project.traction_revenue || "Not specified"} revenue
 - Ask: ${project.ask_amount}
 
+Pitch type: ${promptType}
+
 User's pitch attempt:
 """
 ${userPitch}
 """
 
-Provide 4-5 feedback items covering: Clarity, Hook/Opening, Specificity/Numbers, Traction Evidence, and The Ask.
-Return ONLY the JSON array, no other text.`;
+Return ONLY valid JSON in this exact format:
+{
+  "score": number,
+  "strengths": ["strength 1", "strength 2"],
+  "weaknesses": ["weakness 1", "weakness 2"],
+  "rewrite_suggestion": "improved version of the pitch"
+}
+
+Also include a breakdown array for detailed feedback:
+{
+  "score": number,
+  "strengths": ["strength 1", "strength 2"],
+  "weaknesses": ["weakness 1", "weakness 2"],
+  "rewrite_suggestion": "improved version of the pitch",
+  "feedback": [
+    {"category": "Clarity", "score": "good" | "needs_work" | "missing", "feedback": "1-2 sentences of specific advice"},
+    {"category": "Hook", "score": "good" | "needs_work" | "missing", "feedback": "1-2 sentences"},
+    {"category": "Specificity", "score": "good" | "needs_work" | "missing", "feedback": "1-2 sentences"},
+    {"category": "Traction", "score": "good" | "needs_work" | "missing", "feedback": "1-2 sentences"},
+    {"category": "Ask", "score": "good" | "needs_work" | "missing", "feedback": "1-2 sentences"}
+  ]
+}`;
 
     console.log(`Getting feedback for ${promptType} pitch`);
 
-    // Call Lovable AI Gateway
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
+    const messages = [
+      { role: "system", content: FUNDINGNEMO_SYSTEM },
+      { role: "user", content: userPrompt },
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    let content: string;
+    try {
+      content = await callGradientAI(messages);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "RATE_LIMIT") {
+          return new Response(
+            JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (error.message === "AUTH_ERROR") {
+          return new Response(
+            JSON.stringify({ error: "AI service authentication error. Please check your API key." }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Payment required, please add funds to your workspace." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("No feedback generated");
+      throw error;
     }
 
     // Parse the JSON response
@@ -100,7 +141,20 @@ Return ONLY the JSON array, no other text.`;
     try {
       // Clean the response in case it has markdown code blocks
       const cleanContent = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      feedback = JSON.parse(cleanContent);
+      const parsed = JSON.parse(cleanContent);
+      
+      // Extract the feedback array, or create one from the response
+      if (parsed.feedback) {
+        feedback = parsed.feedback;
+      } else {
+        // Convert the structured response to the expected feedback format
+        feedback = [
+          { category: "Overall Score", score: parsed.score >= 7 ? "good" : parsed.score >= 4 ? "needs_work" : "missing", feedback: `Score: ${parsed.score}/10` },
+          { category: "Strengths", score: "good", feedback: parsed.strengths?.join(". ") || "See detailed feedback" },
+          { category: "Areas to Improve", score: "needs_work", feedback: parsed.weaknesses?.join(". ") || "See detailed feedback" },
+          { category: "Suggested Rewrite", score: "good", feedback: parsed.rewrite_suggestion || "No rewrite provided" },
+        ];
+      }
     } catch (parseError) {
       console.error("Failed to parse feedback JSON:", content);
       // Fallback feedback
