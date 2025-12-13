@@ -1,10 +1,12 @@
 /**
  * AI Client for FundingNEMO
- * Routes all AI calls through Supabase Edge Functions (Gradient AI)
+ * Routes all AI calls through external Flask backend (Gradient AI)
  * Never exposes API keys to the frontend
  */
 
-import { supabase } from '@/integrations/supabase/client';
+// Get the Flask backend URL from environment variable
+// Default to empty string - user must configure this after deploying Flask backend
+const FLASK_API_URL = import.meta.env.VITE_FLASK_API_URL || '';
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -24,77 +26,106 @@ interface GenerateResponse {
 }
 
 /**
- * Call the generate-pitch edge function
+ * Helper to make requests to the Flask backend
+ */
+async function flaskRequest(endpoint: string, body: Record<string, unknown>): Promise<Response> {
+  if (!FLASK_API_URL) {
+    throw new Error('Flask backend URL not configured. Set VITE_FLASK_API_URL environment variable.');
+  }
+
+  const response = await fetch(`${FLASK_API_URL}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  return response;
+}
+
+/**
+ * Call the generate-pitch endpoint
  */
 export async function generatePitchAsset(
   projectId: string,
   assetType: string,
   project: Record<string, unknown>
 ): Promise<GenerateResponse> {
-  const { data, error } = await supabase.functions.invoke('generate-pitch', {
-    body: { projectId, assetType, project },
+  const response = await flaskRequest('/generate-pitch', { 
+    projectId, 
+    assetType, 
+    project 
   });
 
-  if (error) {
-    throw new Error(error.message || 'Failed to generate pitch asset');
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to generate pitch asset');
   }
 
   return data;
 }
 
 /**
- * Call the ai-advisor edge function
+ * Call the ai-advisor endpoint
  */
 export async function callAdvisor(
   advisorType: string,
   project: Record<string, unknown>
 ): Promise<GenerateResponse> {
-  const { data, error } = await supabase.functions.invoke('ai-advisor', {
-    body: { advisorType, project },
+  const response = await flaskRequest('/ai-advisor', { 
+    advisorType, 
+    project 
   });
 
-  if (error) {
-    throw new Error(error.message || 'Failed to get advisor response');
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to get advisor response');
   }
 
   return data;
 }
 
 /**
- * Call the pitch-feedback edge function
+ * Call the pitch-feedback endpoint
  */
 export async function getPitchFeedback(
   project: Record<string, unknown>,
   pitchType: string,
   userPitch: string
 ): Promise<GenerateResponse> {
-  const { data, error } = await supabase.functions.invoke('pitch-feedback', {
-    body: { project, pitchType, userPitch },
+  const response = await flaskRequest('/pitch-feedback', { 
+    project, 
+    promptType: pitchType, 
+    userPitch 
   });
 
-  if (error) {
-    throw new Error(error.message || 'Failed to get pitch feedback');
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to get pitch feedback');
   }
 
   return data;
 }
 
 /**
- * Generic AI generate function (uses generate-pitch with custom messages)
+ * Generic AI generate function
  */
 export async function generateAI(options: GenerateOptions): Promise<GenerateResponse> {
-  // Use the generate-pitch function with a generic approach
-  const { data, error } = await supabase.functions.invoke('generate-pitch', {
-    body: { 
-      projectId: 'generic',
-      assetType: 'custom',
-      messages: options.messages,
-      max_tokens: options.max_tokens
-    },
+  const response = await flaskRequest('/generate-pitch', { 
+    projectId: 'generic',
+    assetType: 'custom',
+    messages: options.messages,
+    max_tokens: options.max_tokens
   });
 
-  if (error) {
-    throw new Error(error.message || 'Failed to generate content');
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to generate content');
   }
 
   return data;
