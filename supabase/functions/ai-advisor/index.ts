@@ -5,8 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const GRADIENT_API_URL = "https://api.gradient.ai/v1/chat/completions";
-const MODEL = "openai-gpt-oss-120b";
+const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const MODEL = "google/gemini-2.5-flash";
 
 const FUNDINGNEMO_SYSTEM = `You are FundingNEMO, an expert startup fundraising advisor.
 You help early-stage founders prepare investor-ready materials.
@@ -15,38 +15,43 @@ You avoid hype, buzzwords, and unrealistic claims.
 You provide outputs that are immediately usable by founders.
 When appropriate, return structured JSON exactly as requested.`;
 
-async function callGradientAI(messages: { role: string; content: string }[]): Promise<string> {
-  const MODEL_ACCESS_KEY = Deno.env.get("MODEL_ACCESS_KEY");
+async function callLovableAI(messages: { role: string; content: string }[]): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-  if (!MODEL_ACCESS_KEY) {
-    throw new Error("MODEL_ACCESS_KEY is not configured");
+  if (!LOVABLE_API_KEY) {
+    throw new Error("LOVABLE_API_KEY is not configured");
   }
 
-  const response = await fetch(GRADIENT_API_URL, {
+  console.log("Calling Lovable AI gateway...");
+
+  const response = await fetch(LOVABLE_AI_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${MODEL_ACCESS_KEY}`,
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       model: MODEL,
       messages,
-      max_tokens: 900,
+      max_tokens: 1500,
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Gradient AI error:", response.status, errorText);
+    console.error("Lovable AI error:", response.status, errorText);
 
     if (response.status === 429) {
       throw new Error("RATE_LIMIT");
     }
-    if (response.status === 402 || response.status === 401) {
+    if (response.status === 402) {
+      throw new Error("PAYMENT_REQUIRED");
+    }
+    if (response.status === 401) {
       throw new Error("AUTH_ERROR");
     }
 
-    throw new Error(`Gradient AI error: ${response.status}`);
+    throw new Error(`Lovable AI error: ${response.status}`);
   }
 
   const data = await response.json();
@@ -321,7 +326,7 @@ Return ONLY valid JSON:
 
     let content: string;
     try {
-      content = await callGradientAI(messages);
+      content = await callLovableAI(messages);
     } catch (error) {
       if (error instanceof Error) {
         if (error.message === "RATE_LIMIT") {
@@ -330,9 +335,15 @@ Return ONLY valid JSON:
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        if (error.message === "PAYMENT_REQUIRED") {
+          return new Response(
+            JSON.stringify({ error: "AI credits exhausted. Please add funds to continue." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         if (error.message === "AUTH_ERROR") {
           return new Response(
-            JSON.stringify({ error: "AI service authentication error. Please check your API key." }),
+            JSON.stringify({ error: "AI service authentication error." }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
