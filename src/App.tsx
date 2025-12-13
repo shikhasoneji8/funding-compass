@@ -10,6 +10,7 @@ import Signup from "./pages/Signup";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
+import InvestorPanel from "./pages/InvestorPanel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/project/:id" element={<ProjectDetail />} />
+            <Route path="/investor-panel" element={<InvestorPanel />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
