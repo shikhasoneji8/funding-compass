@@ -1,12 +1,9 @@
 /**
  * AI Client for FundingNEMO
- * Routes all AI calls through external Flask backend (Gradient AI)
- * Never exposes API keys to the frontend
+ * Routes all AI calls through Supabase Edge Functions
  */
 
-// Get the Flask backend URL from environment variable
-// Default to empty string - user must configure this after deploying Flask backend
-const FLASK_API_URL = import.meta.env.VITE_FLASK_API_URL || '';
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -26,86 +23,56 @@ interface GenerateResponse {
 }
 
 /**
- * Helper to make requests to the Flask backend
- */
-async function flaskRequest(endpoint: string, body: Record<string, unknown>): Promise<Response> {
-  if (!FLASK_API_URL) {
-    throw new Error('Flask backend URL not configured. Set VITE_FLASK_API_URL environment variable.');
-  }
-
-  const response = await fetch(`${FLASK_API_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  return response;
-}
-
-/**
- * Call the generate-pitch endpoint
+ * Call the generate-pitch edge function
  */
 export async function generatePitchAsset(
   projectId: string,
   assetType: string,
   project: Record<string, unknown>
 ): Promise<GenerateResponse> {
-  const response = await flaskRequest('/generate-pitch', { 
-    projectId, 
-    assetType, 
-    project 
+  const { data, error } = await supabase.functions.invoke('generate-pitch', {
+    body: { projectId, assetType, project }
   });
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to generate pitch asset');
+  if (error) {
+    throw new Error(error.message || 'Failed to generate pitch asset');
   }
 
   return data;
 }
 
 /**
- * Call the ai-advisor endpoint
+ * Call the ai-advisor edge function
  */
 export async function callAdvisor(
   advisorType: string,
   project: Record<string, unknown>
 ): Promise<GenerateResponse> {
-  const response = await flaskRequest('/ai-advisor', { 
-    advisorType, 
-    project 
+  const { data, error } = await supabase.functions.invoke('ai-advisor', {
+    body: { advisorType, project }
   });
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to get advisor response');
+  if (error) {
+    throw new Error(error.message || 'Failed to get advisor response');
   }
 
   return data;
 }
 
 /**
- * Call the pitch-feedback endpoint
+ * Call the pitch-feedback edge function
  */
 export async function getPitchFeedback(
   project: Record<string, unknown>,
   pitchType: string,
   userPitch: string
 ): Promise<GenerateResponse> {
-  const response = await flaskRequest('/pitch-feedback', { 
-    project, 
-    promptType: pitchType, 
-    userPitch 
+  const { data, error } = await supabase.functions.invoke('pitch-feedback', {
+    body: { project, promptType: pitchType, userPitch }
   });
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to get pitch feedback');
+  if (error) {
+    throw new Error(error.message || 'Failed to get pitch feedback');
   }
 
   return data;
@@ -115,17 +82,17 @@ export async function getPitchFeedback(
  * Generic AI generate function
  */
 export async function generateAI(options: GenerateOptions): Promise<GenerateResponse> {
-  const response = await flaskRequest('/generate-pitch', { 
-    projectId: 'generic',
-    assetType: 'custom',
-    messages: options.messages,
-    max_tokens: options.max_tokens
+  const { data, error } = await supabase.functions.invoke('generate-pitch', {
+    body: { 
+      projectId: 'generic',
+      assetType: 'custom',
+      messages: options.messages,
+      max_tokens: options.max_tokens
+    }
   });
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to generate content');
+  if (error) {
+    throw new Error(error.message || 'Failed to generate content');
   }
 
   return data;
