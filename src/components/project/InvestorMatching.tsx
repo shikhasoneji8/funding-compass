@@ -1,9 +1,9 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Users, Star, Building2, Rocket, Plus } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
-import { callAdvisor } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -59,13 +59,14 @@ export function InvestorMatching({ project, onAddInvestor }: InvestorMatchingPro
   const generateMatches = async () => {
     setLoading(true);
     try {
-      const response = await callAdvisor('investor_matching', project as unknown as Record<string, unknown>);
+      const { data, error } = await supabase.functions.invoke('ai-advisor', {
+        body: { project, advisorType: 'investor_matching' }
+      });
       
-      if (response.json) {
-        setData(response.json as unknown as InvestorData);
-      } else if (response.text) {
-        const parsed = JSON.parse(response.text);
-        setData(parsed);
+      if (error) throw error;
+      
+      if (data?.data) {
+        setData(data.data as InvestorData);
       } else {
         throw new Error("No investor matches generated");
       }
