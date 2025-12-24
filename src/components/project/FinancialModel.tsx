@@ -1,9 +1,9 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, TrendingUp, DollarSign, Target, BarChart3, AlertTriangle } from "lucide-react";
 import { AdvisorSkeleton } from "./AdvisorSkeleton";
-import { callAdvisor } from "@/lib/aiClient";
 
 interface Project {
   id: string;
@@ -61,13 +61,14 @@ export function FinancialModel({ project }: { project: Project }) {
   const generateModel = async () => {
     setLoading(true);
     try {
-      const response = await callAdvisor('financial_model', project as unknown as Record<string, unknown>);
+      const { data, error } = await supabase.functions.invoke('ai-advisor', {
+        body: { project, advisorType: 'financial_model' }
+      });
       
-      if (response.json) {
-        setData(response.json as unknown as FinancialData);
-      } else if (response.text) {
-        const parsed = JSON.parse(response.text);
-        setData(parsed);
+      if (error) throw error;
+      
+      if (data?.data) {
+        setData(data.data as FinancialData);
       } else {
         throw new Error("No financial model generated");
       }
