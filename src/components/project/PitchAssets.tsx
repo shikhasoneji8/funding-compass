@@ -86,20 +86,16 @@ export function PitchAssets({ project }: { project: Project }) {
     setGenerating(assetType);
     
     try {
-      // Call Gradient AI via edge function
-      const response = await generatePitchAsset(
-        project.id, 
-        assetType, 
-        project as unknown as Record<string, unknown>
-      );
+      // Call edge function via Supabase
+      const { data, error } = await supabase.functions.invoke('generate-pitch', {
+        body: { project, assetType }
+      });
       
-      // Get content - either JSON stringified or text
-      let content: string;
-      if (response.json) {
-        content = JSON.stringify(response.json, null, 2);
-      } else if (response.text) {
-        content = response.text;
-      } else {
+      if (error) throw error;
+      
+      // Get content from edge function response
+      const content = data?.content;
+      if (!content) {
         throw new Error("No content generated");
       }
 
